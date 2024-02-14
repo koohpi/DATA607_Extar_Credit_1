@@ -1,0 +1,149 @@
+---
+title: "Extra_Credit_1_Binary"
+author: "Koohyar Pooladvand"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+First let's donwlaod the data from the source. 
+
+```{r load_data, echo=TRUE}
+#LaodData
+library('RCurl')
+library(tidyverse)
+#for downlaoding the CSV we need to use raw code, otherwise, we will not be able to doan the file correctly
+URL <- "https://raw.githubusercontent.com/acatlin/data/master/penguin_predictions.csv"
+URL_handle <- RCurl::getURL(URL)
+Penguins_data<-data.frame(read.csv(text=URL_handle, header=TRUE,sep=","))
+
+print("This is the size of the dataframen and let's take a look at its contents")
+#dim(Major_data)
+pillar::glimpse(Penguins_data)
+
+```
+
+## #1 Calculate and state the null error rate
+Calculate and state the null error rate for the provided 
+classification_model_performance.csv dataset. Create a plot showing the data 
+distribution of the actual explanatory variable. Explain why always knowing the 
+null error rate (or majority class percent) matters.
+
+
+```{r null_erro, echo=TRUE}
+Penguins_data <- mutate(Penguins_data, new_column=(.pred_female>=0.5))
+DF <- data.frame(
+  True_zero_mean=numeric(1),
+  True_zero_counts=numeric(1)
+  )
+DF$True_zero_mean <-  mean(Penguins_data$new_column)
+DF$True_zero_counts <-  sum(Penguins_data$new_column==TRUE)
+
+#DF['True_zero_mean'] = Penguins_data|>mutate(new_column=(.pred_female>=0.5))|>summarise(mean(new_column))
+#DF['True_zero_counts'] = Penguins_data|>mutate(new_column=(.pred_female>=0.5))|>summarise #(sum(new_column==TRUE))
+br_plt <- barplot(height=c(DF$True_zero_counts,length(Penguins_data$new_column)-DF$True_zero_counts),
+                  names.arg = c("1","0"),
+                  main = "Target counts", 
+                  xlab = "Target counts",
+                  ylab = "Counts", 
+                  col = c("blue","red"),
+                  las = 1,
+                  border = "black",  # Add black borders to the bars
+                  cex.names = 1.5,  # Adjust the size of the names
+                  space = 1,  # Adjust the space between bars
+                  ylim = c(0,max(DF$True_zero_counts,length(Penguins_data$new_column)-DF$True_zero_counts)+10)
+)
+
+# Add value labels on top of the bars
+text.default(x = br_plt, y = c(DF$True_zero_counts,length(Penguins_data$new_column)-DF$True_zero_counts) + 2,
+             labels = round(c(DF$True_zero_mean,1-DF$True_zero_mean)*100,3), pos = 3, cex = 1.2,
+             col = "purple")
+
+
+
+
+  
+```
+
+## #2 of the assignment 
+Analyze the data to determine the true positive, false positive, true negative, and false negative values for the dataset, using .pred_female thresholds of 0.2, 0.5, and 0.8. Display your results in three confusion matrices, with the counts of TP, FP, TN, and FN. You may code your confusion matrix ‘by hand’ (encouraged!), but full credit if you use ‘pre-packaged methods’ here.
+
+the below code does what is asked, i used pre-packed methods to calculate them. 
+There is an interesting observation: if we only want to increase the true positives (TP) for females, it seems that a threshold of 0.2 predicts the most correct female cases, with TP being 37 compared to 36 with thresholds of 0.5 and 0.8. However, for males, the situation is different. The TP for males increases as the threshold increases to 0.8 from 0.2, with correct male predictions increasing from 48 to 52. So, it is interesting to see how tightening the criteria leads to less precise predictions for one sex versus the other. This underscores the importance of carefully choosing the threshold based on specific goals. 
+
+
+```{r confusion_matrics, echo=TRUE}
+
+#first lets create three new columns based off .pred_female and the three different threshold 
+
+Penguins_data <- Penguins_data %>%
+  mutate(threshold_0.2 = ifelse(.pred_female < 0.2, "male", "female"))
+
+# Create a confusion matrix
+conf_matrix_0.2 <- table(Penguins_data$threshold_0.2, Penguins_data$sex)
+
+# Print the confusion matrix
+print("result based on threshold of 0.2")
+print(conf_matrix_0.2)
+
+
+Penguins_data <- Penguins_data %>%
+  mutate(threshold_0.5 = ifelse(.pred_female < 0.5, "male", "female"))
+# Create a confusion matrix
+conf_matrix_0.5 <- table(Penguins_data$threshold_0.5, Penguins_data$sex)
+
+# Print the confusion matrix
+print("result based on threshold of 0.5")
+print(conf_matrix_0.5)
+
+Penguins_data <- Penguins_data %>%
+  mutate(threshold_0.8 = ifelse(.pred_female < 0.8, "male", "female"))
+# Create a confusion matrix
+conf_matrix_0.8 <- table(Penguins_data$threshold_0.8, Penguins_data$sex)
+
+# Print the confusion matrix
+print("result based on threshold of 0.8")
+print(conf_matrix_0.8)
+
+```
+
+## #3 clculate accuracy for the data based o nthe threshold listed above 
+Create a table showing—for each of the three thresholds—the accuracy,
+precision, recall, and F1 scores
+
+Accuracy = (TP+TN)/(all (TP+TN+FP+FN))
+Precision = TP/(TP+FP)
+Recall = TP / (TP+FN)
+F1 Score = 2 x (Precision x Recall) / (Precision + Recall)
+
+```{r scores_calculation, echo=TRUE}
+  accuracy_0.2 <- sum(diag(conf_matrix_0.2)) / sum(conf_matrix_0.2)
+  precision_0.2 <- conf_matrix_0.2[1] / (conf_matrix_0.2[1]+conf_matrix_0.2[2])
+  recall_0.2 <- conf_matrix_0.2[1] / (conf_matrix_0.2[1]+conf_matrix_0.2[3])
+  f1_score_0.2 <- 2 * (precision_0.2 * recall_0.2) / (precision_0.2 + recall_0.2)
+
+  cat("Summary result for the threshold 0.2 is as follow accuracy = ", accuracy_0.2, ", Precision = ", precision_0.2, ", Recall = ", recall_0.2,", and F1 Score = ", f1_score_0.2,"\n \n")
+
+    accuracy_0.5 <- sum(diag(conf_matrix_0.5)) / sum(conf_matrix_0.5)
+  precision_0.5 <- conf_matrix_0.5[1] / (conf_matrix_0.5[1]+conf_matrix_0.5[2])
+  recall_0.5 <- conf_matrix_0.5[1] / (conf_matrix_0.5[1]+conf_matrix_0.5[3])
+  f1_score_0.5 <- 2 * (precision_0.5 * recall_0.5) / (precision_0.5 + recall_0.5)
+
+  cat("Summary result for the threshold 0.5 is as follow accuracy = ", accuracy_0.5, ", Precision = ", precision_0.5, ", Recall = ", recall_0.5,", and F1 Score = ", f1_score_0.5,"\n \n")
+
+    accuracy_0.8 <- sum(diag(conf_matrix_0.8)) / sum(conf_matrix_0.8)
+  precision_0.8 <- conf_matrix_0.8[1] / (conf_matrix_0.8[1]+conf_matrix_0.8[2])
+  recall_0.8 <- conf_matrix_0.8[1] / (conf_matrix_0.8[1]+conf_matrix_0.8[3])
+  f1_score_0.8 <- 2 * (precision_0.8 * recall_0.8) / (precision_0.8 + recall_0.8)
+
+  cat("Summary result for the threshold 0.8 is as follow accuracy = ", accuracy_0.8, ", Precision = ", precision_0.8, ", Recall = ", recall_0.8,", and F1 Score = ", f1_score_0.8,"\n \n")
+
+  
+```
+## #4 Giving example 
+In this case the precision for threshold 0.2 is better with the score be ~95% while for the 0.5 and 0.8 precision is lower ~92%. But as the threshold increases to 0.8 the accuracy in general has improved. 
+
